@@ -47,6 +47,9 @@ namespace BSFixes
                 (message.Contains("[SettingsIO] Decode: Unknown property 'quest.cpu_level'") ||
                  message.Contains("[SettingsIO] Decode: Unknown property 'quest.gpu_level'") ||
                  message.Contains("[DlcPromoPanelModel] No PromoPanel assets discovered") ||
+                 message.Contains("OnLevelWasLoaded was found on PluginComponent") ||
+                 message.Contains("This message has been deprecated in a later version of Unity.") ||
+                 message.Contains("Add a delegate to SceneManager.sceneLoaded instead to get notifications after scene loading has completed") ||
                  message.Contains("Your project uses a scriptable render pipeline. You can use Camera.stereoTargetEye only with the built-in renderer.")))
                 return true;
 

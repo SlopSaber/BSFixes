@@ -6,6 +6,7 @@ Current behavior filters only confirmed harmless Unity startup noise:
 
 - stale Quest-only SettingsIO properties on PC;
 - missing DLC promo assets;
+- deprecated OnLevelWasLoaded notices from the loader;
 - Camera.stereoTargetEye warning under a scriptable render pipeline;
 - malformed internal cvar.System.* command-name errors.
 
