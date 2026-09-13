@@ -1,0 +1,11 @@
+{
+  "id": "BSFixes",
+  "name": "BSFixes",
+  "author": "iPixelGalaxy",
+  "version": "0.1.0",
+  "description": "Small compatibility fixes for harmless Beat Saber runtime warnings.",
+  "gameVersion": "1.45.0",
+  "dependsOn": {
+    "BSIPA": "^4.3.7"
+  }
+}
