@@ -6,6 +6,7 @@ namespace BSFixes
     internal sealed class FilteringLogHandler : ILogHandler
     {
         private readonly ILogHandler innerHandler;
+        private bool loggedActivationTrace;
 
         public FilteringLogHandler(ILogHandler innerHandler)
         {
@@ -22,6 +23,15 @@ namespace BSFixes
             string message = FormatMessage(format, args);
             if (IsKnownHarmlessMessage(logType, message))
                 return;
+
+            if (!loggedActivationTrace && logType == LogType.Error &&
+                message == "GameObjects can not be made active when they are being destroyed.")
+            {
+                loggedActivationTrace = true;
+                innerHandler.LogFormat(logType, context, "{0}\nActivation caller:\n{1}",
+                    message, new System.Diagnostics.StackTrace(1, false).ToString());
+                return;
+            }
 
             innerHandler.LogFormat(logType, context, format, args);
         }
