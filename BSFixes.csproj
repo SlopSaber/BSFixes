@@ -6,7 +6,7 @@
     <Nullable>disable</Nullable>
     <RootNamespace>BSFixes</RootNamespace>
     <AssemblyName>BSFixes</AssemblyName>
-    <BeatSaberDir Condition="'$(BeatSaberDir)' == ''">D:\BSManager\BSInstances\1.45.0</BeatSaberDir>
+    <BeatSaberDir Condition="'$(BeatSaberDir)' == ''">D:\BSManager\BSInstances\1.45.1</BeatSaberDir>
     <OutputPath>bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
