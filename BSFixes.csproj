@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="0Harmony" HintPath="$(BeatSaberDir)\Libs\0Harmony.dll" Private="false" />
     <Reference Include="IPA.Loader">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\IPA.Loader.dll</HintPath>
     </Reference>
