@@ -7,6 +7,12 @@
     <RootNamespace>BSFixes</RootNamespace>
     <AssemblyName>BSFixes</AssemblyName>
     <BeatSaberDir Condition="'$(BeatSaberDir)' == ''">D:\BSManager\BSInstances\1.45.1</BeatSaberDir>
+    <GameDirectory>$(BeatSaberDir)</GameDirectory>
+    <ImportBSMTTargets>true</ImportBSMTTargets>
+    <BSMTProjectType>BSIPA</BSMTProjectType>
+    <GenerateManifest>false</GenerateManifest>
+    <CopyPDB>false</CopyPDB>
+    <DisableCopyToGame>false</DisableCopyToGame>
     <OutputPath>bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
@@ -18,9 +24,9 @@
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
-    <PackageReference Include="BeatSaberModdingTools.Tasks" Version="1.4.3">
+    <PackageReference Include="BeatSaberModdingTools.Tasks" Version="2.0.0-beta7">
       <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>build;native;contentfiles;analyzers;buildtransitive</IncludeAssets>
+      <IncludeAssets>build;contentfiles;analyzers;buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
 
