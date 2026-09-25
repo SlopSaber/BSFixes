@@ -10,4 +10,6 @@ Current behavior filters only confirmed harmless Unity startup noise:
 - Camera.stereoTargetEye warning under a scriptable render pipeline;
 - malformed internal cvar.System.* command-name errors.
 
-LIV errors stay visible because they can indicate a real capture problem.
+When no LIV app path exists in `LIV_APP_PATH` or the LIV app registry key,
+BSFixes skips Beat Saber's LIV initialization. An installed LIV app keeps the
+game's normal integration and error reporting.
