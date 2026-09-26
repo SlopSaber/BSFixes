@@ -20,6 +20,12 @@ namespace BSFixes
 
         public void LogFormat(LogType logType, UnityEngine.Object context, string format, params object[] args)
         {
+            if (logType != LogType.Warning && logType != LogType.Error)
+            {
+                innerHandler.LogFormat(logType, context, format, args);
+                return;
+            }
+
             string message = FormatMessage(format, args);
             if (IsKnownHarmlessMessage(logType, message))
                 return;
