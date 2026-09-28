@@ -18,17 +18,17 @@ namespace BSFixes
     internal static class SteamVRResolutionSync
     {
         private const string AppSection = "steam.app.620980";
-        private const float PollIntervalSeconds = 2f;
+        private const float PollIntervalSeconds = 0.5f;
         private static IPALogger logger;
         private static string settingsPath;
         private static float nextPollTime;
         private static float gameScale;
         private static float baselineAreaScale;
         private static float appliedFactor = 1f;
-        private static bool baselineManualOverride;
+        private static int previousEyeWidth;
         private static bool hasGameScale;
         private static bool hasBaseline;
-        private static bool warnedModeChange;
+        private static bool verifyResize;
 
         internal static void Start(IPALogger pluginLogger)
         {
@@ -55,6 +55,17 @@ namespace BSFixes
                 return;
 
             nextPollTime = Time.realtimeSinceStartup + PollIntervalSeconds;
+            if (verifyResize)
+            {
+                int width = XRSettings.eyeTextureWidth;
+                int height = XRSettings.eyeTextureHeight;
+                if (width == previousEyeWidth)
+                    logger.Warn($"SteamVR requested a new eye texture scale, but the eye texture is still {width}x{height}.");
+                else
+                    logger.Info($"SteamVR eye textures resized to {width}x{height} per eye.");
+                verifyResize = false;
+            }
+
             float areaScale;
             bool manualOverride;
             if (!hasGameScale || settingsPath == null || !XRSettings.isDeviceActive ||
@@ -65,31 +76,23 @@ namespace BSFixes
             if (!hasBaseline)
             {
                 baselineAreaScale = areaScale;
-                baselineManualOverride = manualOverride;
                 hasBaseline = true;
-                logger.Info($"SteamVR resolution sync active: {XRSettings.eyeTextureWidth}x{XRSettings.eyeTextureHeight} per eye, SteamVR scale {areaScale:0.###}.");
+                logger.Info($"SteamVR resolution sync active: {XRSettings.eyeTextureWidth}x{XRSettings.eyeTextureHeight} per eye, SteamVR {(manualOverride ? "manual" : "automatic")} scale {areaScale:0.###}.");
                 return;
             }
 
-            // Auto and manual use different SteamVR baselines. A switch between
-            // them needs a new OpenXR recommendation on the next game launch.
-            if (manualOverride != baselineManualOverride)
-            {
-                if (!warnedModeChange)
-                {
-                    logger.Warn("SteamVR automatic/manual resolution mode changed; restart Beat Saber to use its new baseline.");
-                    warnedModeChange = true;
-                }
-                return;
-            }
-
+            // SteamVR does not persist the effective automatic scale. Treat it
+            // as 100% for live adjustment; a fresh launch uses the exact runtime
+            // recommendation if automatic scaling differs from that baseline.
             float factor = Mathf.Sqrt(areaScale / baselineAreaScale);
             if (Mathf.Abs(factor - appliedFactor) < 0.001f)
                 return;
 
+            previousEyeWidth = XRSettings.eyeTextureWidth;
             appliedFactor = factor;
             XRSettings.eyeTextureResolutionScale = gameScale * factor;
-            logger.Info($"SteamVR resolution changed; eye texture scale is now {XRSettings.eyeTextureResolutionScale:0.###}.");
+            verifyResize = true;
+            logger.Info($"SteamVR resolution changed to {(manualOverride ? "manual" : "automatic")} {areaScale:0.###}; eye texture scale is now {XRSettings.eyeTextureResolutionScale:0.###}.");
         }
 
         private static bool TryReadAreaScale(out float areaScale, out bool manualOverride)
