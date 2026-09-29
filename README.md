@@ -16,7 +16,8 @@ game's normal integration and error reporting.
 
 On SteamVR/OpenXR, BSFixes checks SteamVR's global manual and Beat Saber
 per-application resolution settings twice per second. If either changes while
-the game runs, it resizes the eye textures. Beat Saber's own VR resolution
+the game runs, it updates the active OpenXR display's render target scale.
+BSFixes logs the render-pass width after each change. Beat Saber's own VR resolution
 multiplier still applies in menu and gameplay. Switching SteamVR between
 automatic and manual resolution also triggers an eye-texture resize. SteamVR
 does not save its effective automatic scale, so a restart gives the exact

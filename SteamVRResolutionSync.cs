@@ -14,7 +14,7 @@ using IPALogger = IPA.Logging.Logger;
 namespace BSFixes
 {
     // SteamVR's OpenXR recommendation is used when Unity creates the swapchain.
-    // Changing SteamVR resolution afterward does not resize that swapchain.
+    // Later changes need to be applied to the active XR display subsystem.
     internal static class SteamVRResolutionSync
     {
         private const string AppSection = "steam.app.620980";
@@ -25,50 +25,69 @@ namespace BSFixes
         private static float gameScale;
         private static float baselineAreaScale;
         private static float appliedFactor = 1f;
-        private static int previousEyeWidth;
+        private static int previousRenderWidth;
         private static bool hasGameScale;
         private static bool hasBaseline;
         private static bool verifyResize;
+        private static bool needsApply;
+        private static bool retriedUnexpectedReset;
+        private static GameObject pollerObject;
+        private static XRDisplaySubsystem activeDisplay;
+        private static readonly List<XRDisplaySubsystem> displays = new List<XRDisplaySubsystem>(1);
 
         internal static void Start(IPALogger pluginLogger)
         {
             logger = pluginLogger;
             settingsPath = FindSettingsPath();
-            Application.onBeforeRender += OnBeforeRender;
+            pollerObject = new GameObject("BSFixes SteamVR Resolution Sync");
+            pollerObject.hideFlags = HideFlags.HideInHierarchy;
+            UnityEngine.Object.DontDestroyOnLoad(pollerObject);
+            pollerObject.AddComponent<SteamVRResolutionPoller>();
         }
 
         internal static void Stop()
         {
-            Application.onBeforeRender -= OnBeforeRender;
+            if (pollerObject != null)
+                UnityEngine.Object.Destroy(pollerObject);
+            pollerObject = null;
         }
 
         internal static float AdjustGameScale(float scale)
         {
             gameScale = scale;
             hasGameScale = true;
+            needsApply = true;
             return scale * appliedFactor;
         }
 
-        private static void OnBeforeRender()
+        internal static void Poll()
         {
             if (Time.realtimeSinceStartup < nextPollTime)
                 return;
 
             nextPollTime = Time.realtimeSinceStartup + PollIntervalSeconds;
+            XRDisplaySubsystem display = GetRunningDisplay();
+            if (!ReferenceEquals(display, activeDisplay))
+            {
+                activeDisplay = display;
+                needsApply = true;
+                retriedUnexpectedReset = false;
+            }
             if (verifyResize)
             {
-                int width = XRSettings.eyeTextureWidth;
-                int height = XRSettings.eyeTextureHeight;
-                if (width == previousEyeWidth)
-                    logger.Warn($"SteamVR requested a new eye texture scale, but the eye texture is still {width}x{height}.");
+                int width = GetRenderWidth(display);
+                if (width == 0 || previousRenderWidth == 0)
+                    logger.Warn("SteamVR XR display render size could not be compared after the scale change.");
+                else if (width == previousRenderWidth)
+                    logger.Warn($"SteamVR requested a new render target scale, but the XR display is still {width} pixels wide.");
                 else
-                    logger.Info($"SteamVR eye textures resized to {width}x{height} per eye.");
+                    logger.Info($"SteamVR XR display resized from {previousRenderWidth} to {width} pixels per eye.");
                 verifyResize = false;
             }
 
             float areaScale;
             bool manualOverride;
-            if (!hasGameScale || settingsPath == null || !XRSettings.isDeviceActive ||
+            if (!hasGameScale || settingsPath == null || display == null ||
                 OpenXRRuntime.name.IndexOf("SteamVR", StringComparison.OrdinalIgnoreCase) < 0 ||
                 !TryReadAreaScale(out areaScale, out manualOverride))
                 return;
@@ -77,7 +96,7 @@ namespace BSFixes
             {
                 baselineAreaScale = areaScale;
                 hasBaseline = true;
-                logger.Info($"SteamVR resolution sync active: {XRSettings.eyeTextureWidth}x{XRSettings.eyeTextureHeight} per eye, SteamVR {(manualOverride ? "manual" : "automatic")} scale {areaScale:0.###}.");
+                logger.Info($"SteamVR resolution sync active: XR display {GetRenderWidth(display)} pixels per eye, SteamVR {(manualOverride ? "manual" : "automatic")} scale {areaScale:0.###}.");
                 return;
             }
 
@@ -85,14 +104,41 @@ namespace BSFixes
             // as 100% for live adjustment; a fresh launch uses the exact runtime
             // recommendation if automatic scaling differs from that baseline.
             float factor = Mathf.Sqrt(areaScale / baselineAreaScale);
-            if (Mathf.Abs(factor - appliedFactor) < 0.001f)
-                return;
-
-            previousEyeWidth = XRSettings.eyeTextureWidth;
+            bool steamVRChanged = Mathf.Abs(factor - appliedFactor) >= 0.001f;
             appliedFactor = factor;
-            XRSettings.eyeTextureResolutionScale = gameScale * factor;
-            verifyResize = true;
-            logger.Info($"SteamVR resolution changed to {(manualOverride ? "manual" : "automatic")} {areaScale:0.###}; eye texture scale is now {XRSettings.eyeTextureResolutionScale:0.###}.");
+            float desiredScale = gameScale * factor;
+            bool mismatch = Mathf.Abs(display.scaleOfAllRenderTargets - desiredScale) >= 0.001f;
+            if (steamVRChanged || needsApply || (mismatch && !retriedUnexpectedReset))
+            {
+                retriedUnexpectedReset = !steamVRChanged && !needsApply && mismatch;
+                needsApply = false;
+                if (mismatch)
+                {
+                    previousRenderWidth = GetRenderWidth(display);
+                    display.scaleOfAllRenderTargets = desiredScale;
+                    verifyResize = true;
+                }
+                if (steamVRChanged)
+                    logger.Info($"SteamVR resolution changed to {(manualOverride ? "manual" : "automatic")} {areaScale:0.###}; XR display render target scale is now {display.scaleOfAllRenderTargets:0.###}.");
+            }
+        }
+
+        private static XRDisplaySubsystem GetRunningDisplay()
+        {
+            displays.Clear();
+            SubsystemManager.GetSubsystems(displays);
+            foreach (XRDisplaySubsystem display in displays)
+                if (display.running)
+                    return display;
+            return null;
+        }
+
+        private static int GetRenderWidth(XRDisplaySubsystem display)
+        {
+            if (display == null || display.GetRenderPassCount() == 0)
+                return 0;
+            display.GetRenderPass(0, out XRDisplaySubsystem.XRRenderPass renderPass);
+            return renderPass.renderTargetDesc.width;
         }
 
         private static bool TryReadAreaScale(out float areaScale, out bool manualOverride)
@@ -125,6 +171,14 @@ namespace BSFixes
 
             string path = Path.Combine(steamPath, "config", "steamvr.vrsettings");
             return File.Exists(path) ? path : null;
+        }
+    }
+
+    internal sealed class SteamVRResolutionPoller : MonoBehaviour
+    {
+        private void Update()
+        {
+            SteamVRResolutionSync.Poll();
         }
     }
 

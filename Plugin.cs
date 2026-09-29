@@ -11,16 +11,23 @@ namespace BSFixes
         private readonly Harmony harmony = new Harmony("iPixelGalaxy.BSFixes");
         private ILogHandler originalHandler;
         private FilteringLogHandler filteringHandler;
+        private IPALogger pluginLogger;
 
         [Init]
         public void Init(IPALogger logger)
         {
+            pluginLogger = logger;
             originalHandler = Debug.unityLogger.logHandler;
             filteringHandler = new FilteringLogHandler(originalHandler);
             Debug.unityLogger.logHandler = filteringHandler;
             harmony.PatchAll(typeof(Plugin).Assembly);
-            SteamVRResolutionSync.Start(logger);
             logger.Info("Installed runtime compatibility fixes and Unity startup log filters.");
+        }
+
+        [OnStart]
+        public void OnStart()
+        {
+            SteamVRResolutionSync.Start(pluginLogger);
         }
 
         [OnExit]
