@@ -20,6 +20,7 @@ namespace BSFixes
             originalHandler = Debug.unityLogger.logHandler;
             filteringHandler = new FilteringLogHandler(originalHandler);
             Debug.unityLogger.logHandler = filteringHandler;
+            HighQualityObstacles.Initialize(logger);
             harmony.PatchAll(typeof(Plugin).Assembly);
             logger.Info("Installed runtime compatibility fixes and Unity startup log filters.");
         }
@@ -35,6 +36,7 @@ namespace BSFixes
         {
             SteamVRResolutionSync.Stop();
             harmony.UnpatchSelf();
+            HighQualityObstacles.Stop();
             if (filteringHandler != null && ReferenceEquals(Debug.unityLogger.logHandler, filteringHandler))
                 Debug.unityLogger.logHandler = originalHandler;
         }

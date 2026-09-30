@@ -1,6 +1,14 @@
 # BSFixes
 
-Small Beat Saber 1.45.0 compatibility fixes.
+Small Beat Saber 1.45.2 compatibility fixes.
+
+High obstacle quality now remains available with Screen Distortion Effects off.
+BSFixes keeps the high-quality wall shader and its screen/depth capture, but sets
+wall refraction strength to zero on owned material copies. The graphics checkbox
+and saved setting stay off. Turning distortion on restores normal refraction;
+Low and Medium obstacle quality retain their existing material selection.
+The required screen capture still has a rendering cost. This change does not
+establish that legacy custom-map water renders correctly after the URP transition.
 
 Current behavior filters only confirmed harmless Unity startup noise:
 
