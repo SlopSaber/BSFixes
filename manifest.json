@@ -6,6 +6,6 @@
   "description": "Small compatibility fixes for harmless Beat Saber runtime warnings.",
   "gameVersion": "1.45.3",
   "dependsOn": {
-    "BSIPA": "^4.3.7"
+    "BSIPA": "^5.0.0"
   }
 }
