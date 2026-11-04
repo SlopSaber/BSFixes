@@ -1,9 +1,10 @@
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using BGLib.JsonExtension;
 using HarmonyLib;
-using Newtonsoft.Json;
 
 namespace BSFixes
 {
@@ -14,10 +15,35 @@ namespace BSFixes
     // a freshly built PlayerSaveData snapshot, so serialize that on a worker
     // and write from the main thread as before. Newer saves of the same file,
     // sync or async, supersede an older pending write.
+    //
+    // Newtonsoft types are never referenced directly: a loader may give mods
+    // their own Newtonsoft copy (InitEditor does), and serializing game save
+    // data with it would ignore the game's JSON attributes. The game's own
+    // JsonConvert is found through JsonSettings' field type instead.
     [HarmonyPatch(typeof(FileStorageExtensions))]
     internal static class PlayerDataSaveSerializationPatch
     {
         private static readonly Dictionary<string, int> Generations = new Dictionary<string, int>();
+        private static readonly object DefaultSettings;
+        private static readonly MethodInfo SerializeObject;
+
+        static PlayerDataSaveSerializationPatch()
+        {
+            try
+            {
+                FieldInfo field = typeof(JsonSettings).GetField("compactWithDefault", BindingFlags.Public | BindingFlags.Static);
+                if (field == null) return;
+                Type settingsType = field.FieldType;
+                Type convert = settingsType.Assembly.GetType("Newtonsoft.Json.JsonConvert", false);
+                SerializeObject = convert?.GetMethod("SerializeObject", BindingFlags.Public | BindingFlags.Static, null,
+                    new[] { typeof(object), settingsType }, null);
+                if (SerializeObject != null) DefaultSettings = field.GetValue(null);
+            }
+            catch (Exception)
+            {
+                SerializeObject = null;
+            }
+        }
 
         private static int NextGeneration(string fileName)
         {
@@ -37,25 +63,26 @@ namespace BSFixes
 
         [HarmonyPrefix]
         [HarmonyPatch(nameof(FileStorageExtensions.SaveToJSONFile))]
-        private static void SaveSyncPrefix(string fileName)
+        private static void SaveSyncPrefix(object[] __args)
         {
-            if (fileName != null) NextGeneration(fileName);
+            if (__args.Length > 2 && __args[2] is string fileName) NextGeneration(fileName);
         }
 
         [HarmonyPrefix]
         [HarmonyPatch(nameof(FileStorageExtensions.SaveToJSONFileAsync))]
-        private static bool SaveAsyncPrefix(IFileStorage fileStorage, object obj, string fileName, StoragePreference storageLocation,
-            JsonSerializerSettings overrideSerializerSettings, ref Task __result)
+        private static bool SaveAsyncPrefix(object[] __args, ref Task __result)
         {
-            if (fileName == null) return true;
+            if (__args.Length < 5 || !(__args[2] is string fileName)) return true;
             int generation = NextGeneration(fileName);
             // Only the PlayerData snapshot is known to be detached from live state,
             // and the write must resume on the Unity main-thread context.
-            if (!(obj is PlayerSaveData saveData) || SynchronizationContext.Current == null) return true;
+            if (SerializeObject == null || !(__args[1] is PlayerSaveData saveData) || !(__args[0] is IFileStorage fileStorage)
+                || SynchronizationContext.Current == null) return true;
+            object settings = __args[4] ?? DefaultSettings;
+            if (settings == null || !SerializeObject.GetParameters()[1].ParameterType.IsInstanceOfType(settings)) return true;
 
             DetachLiveLists(saveData);
-            __result = SerializeThenSave(fileStorage, saveData, fileName, storageLocation,
-                overrideSerializerSettings ?? JsonSettings.compactWithDefault, generation);
+            __result = SerializeThenSave(fileStorage, saveData, fileName, (StoragePreference)__args[3], settings, generation);
             return false;
         }
 
@@ -68,10 +95,22 @@ namespace BSFixes
                     player.showedMissionHelpIds = new List<string>(player.showedMissionHelpIds);
         }
 
-        private static async Task SerializeThenSave(IFileStorage fileStorage, object obj, string fileName,
-            StoragePreference storageLocation, JsonSerializerSettings settings, int generation)
+        private static string Serialize(object obj, object settings)
         {
-            string json = await Task.Run(() => JsonConvert.SerializeObject(obj, settings));
+            try
+            {
+                return (string)SerializeObject.Invoke(null, new[] { obj, settings });
+            }
+            catch (TargetInvocationException exception) when (exception.InnerException != null)
+            {
+                throw exception.InnerException;
+            }
+        }
+
+        private static async Task SerializeThenSave(IFileStorage fileStorage, object obj, string fileName,
+            StoragePreference storageLocation, object settings, int generation)
+        {
+            string json = await Task.Run(() => Serialize(obj, settings));
             if (!IsCurrent(fileName, generation)) return;
             await fileStorage.SaveFileAsync(fileName, json, storageLocation);
         }
