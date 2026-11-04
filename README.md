@@ -22,14 +22,16 @@ When no LIV app path exists in `LIV_APP_PATH` or the LIV app registry key,
 BSFixes skips Beat Saber's LIV initialization. An installed LIV app keeps the
 game's normal integration and error reporting.
 
-On SteamVR/OpenXR, BSFixes checks SteamVR's global manual and Beat Saber
-per-application resolution settings twice per second. If either changes while
-the game runs, it updates the active OpenXR display's render target scale.
-BSFixes logs the render-pass width after each change. Beat Saber's own VR resolution
-multiplier still applies in menu and gameplay. Switching SteamVR between
-automatic and manual resolution also triggers an eye-texture resize. SteamVR
-does not save its effective automatic scale, so a restart gives the exact
-runtime-recommended size if automatic scaling differs from 100%.
+While the game runs, BSFixes follows headset resolution changes (for example
+SteamVR's per-application or global resolution slider). Twice per second it asks
+the OpenXR runtime for its current recommended eye size and, on SteamVR, also
+reads SteamVR's resolution settings as a fallback. It then adjusts the XR render
+scale until the measured eye width matches, on top of Beat Saber's own VR
+resolution setting. Each change is logged with both sources and the resulting
+eye width.
+
+The scene-transition loading spinner is centred in front of the camera instead
+of sitting in the lower-right corner, in the headset and on desktop cameras.
 
 Main-thread hitch fixes for game code:
 
