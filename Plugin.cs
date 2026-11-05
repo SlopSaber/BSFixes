@@ -32,12 +32,15 @@ namespace BSFixes
         public void OnStart()
         {
             SteamVRResolutionSync.Start(pluginLogger);
+            try { TypeWarmup.Start(harmony, pluginLogger); }
+            catch (System.Exception exception) { pluginLogger.Warn($"Type warm-up skipped: {exception.Message}"); }
         }
 
         [OnExit]
         public void OnExit()
         {
             SteamVRResolutionSync.Stop();
+            TypeWarmup.Stop();
             harmony.UnpatchSelf();
             HighQualityObstacles.Stop();
             DefaultFontAssetFix.Stop();
