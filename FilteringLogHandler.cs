@@ -7,6 +7,7 @@ namespace BSFixes
     {
         private readonly ILogHandler innerHandler;
         private bool loggedActivationTrace;
+        private bool loggedMissingFontTrace;
 
         public FilteringLogHandler(ILogHandler innerHandler)
         {
@@ -35,6 +36,15 @@ namespace BSFixes
             {
                 loggedActivationTrace = true;
                 innerHandler.LogFormat(logType, context, "{0}\nActivation caller:\n{1}",
+                    message, new System.Diagnostics.StackTrace(1, false).ToString());
+                return;
+            }
+
+            if (!loggedMissingFontTrace && logType == LogType.Warning &&
+                message.StartsWith("The LiberationSans SDF Font Asset was not found.", StringComparison.Ordinal))
+            {
+                loggedMissingFontTrace = true;
+                innerHandler.LogFormat(logType, context, "{0}\nCreated by:\n{1}",
                     message, new System.Diagnostics.StackTrace(1, false).ToString());
                 return;
             }
