@@ -32,6 +32,7 @@
     <Reference Include="Unity.RenderPipelines.Core.Runtime" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\Unity.RenderPipelines.Core.Runtime.dll" Private="false" />
     <Reference Include="Unity.RenderPipelines.Universal.Runtime" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\Unity.RenderPipelines.Universal.Runtime.dll" Private="false" />
     <Reference Include="BGLib.UnityExtension" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\BGLib.UnityExtension.dll" Private="false" />
+    <Reference Include="BeatSaber.ViewSystem" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\BeatSaber.ViewSystem.dll" Private="false" />
     <Reference Include="HMUI" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\HMUI.dll" Private="false" />
     <Reference Include="BGLib.Polyglot" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\BGLib.Polyglot.dll" Private="false" />
     <Reference Include="UnityEngine.AudioModule" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.AudioModule.dll" Private="false" />

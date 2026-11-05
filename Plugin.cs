@@ -23,6 +23,8 @@ namespace BSFixes
             HighQualityObstacles.Initialize(logger);
             DefaultFontAssetFix.Start(logger);
             harmony.PatchAll(typeof(Plugin).Assembly);
+            try { TransitionAlphaPatch.Apply(harmony); }
+            catch (System.Exception exception) { logger.Warn($"Transition alpha patch skipped: {exception.Message}"); }
             logger.Info("Installed runtime compatibility fixes and Unity startup log filters.");
         }
 
