@@ -13,7 +13,10 @@ namespace BSFixes
         }
 
         [HarmonyPrefix]
-        [HarmonyPatch(nameof(SteamPlatformLeaderboardsHandler.GetScores))]
+        [HarmonyPatch(
+            nameof(SteamPlatformLeaderboardsHandler.GetScores),
+            new[] { typeof(BeatmapKey), typeof(int), typeof(int), typeof(PlatformLeaderboardsModel.ScoresScope), typeof(ulong), typeof(PlatformLeaderboardsModel.GetScoresCompletionHandler) },
+            new[] { ArgumentType.Ref, ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal, ArgumentType.Normal })]
         private static bool GetScoresPrefix(ref BeatmapKey beatmapKey, PlatformLeaderboardsModel.GetScoresCompletionHandler completionHandler, ref HMAsyncRequest __result)
         {
             if (!IsCustomLevel(beatmapKey.levelId))
@@ -27,7 +30,9 @@ namespace BSFixes
         }
 
         [HarmonyPrefix]
-        [HarmonyPatch(nameof(SteamPlatformLeaderboardsHandler.UploadScore))]
+        [HarmonyPatch(
+            nameof(SteamPlatformLeaderboardsHandler.UploadScore),
+            new[] { typeof(LeaderboardScoreUploader.ScoreData), typeof(PlatformLeaderboardsModel.UploadScoreCompletionHandler) })]
         private static bool UploadScorePrefix(LeaderboardScoreUploader.ScoreData scoreData, PlatformLeaderboardsModel.UploadScoreCompletionHandler completionHandler, ref HMAsyncRequest __result)
         {
             if (scoreData == null || !IsCustomLevel(scoreData.beatmapKey.levelId))
