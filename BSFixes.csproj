@@ -45,6 +45,7 @@
     <Reference Include="Unity.XR.OpenXR" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\Unity.XR.OpenXR.dll" Private="false" />
     <Reference Include="BGLib.FileStorage" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\BGLib.FileStorage.dll" Private="false" />
     <Reference Include="BGLib.JsonExtension" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\BGLib.JsonExtension.dll" Private="false" />
+    <Reference Include="AdditionalContentModel.Interfaces" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\AdditionalContentModel.Interfaces.dll" Private="false" />
     <Reference Include="DataModels" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\DataModels.dll" Private="false" />
     <Reference Include="HMLib" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\HMLib.dll" Private="false" />
     <Reference Include="MediaLoader" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\MediaLoader.dll" Private="false" />
