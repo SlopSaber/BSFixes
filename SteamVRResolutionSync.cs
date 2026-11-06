@@ -10,6 +10,8 @@ using HarmonyLib;
 using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.XR;
 using UnityEngine.XR.OpenXR;
 using IPALogger = IPA.Logging.Logger;
@@ -52,6 +54,9 @@ namespace BSFixes
         private static int previousRenderWidth;
         private static GameObject pollerObject;
         private static XRDisplaySubsystem activeDisplay;
+        private static UniversalRenderPipelineAsset ownedPipeline;
+        private static float originalPipelineScale;
+        private static float lastPipelineScale;
         private static readonly List<XRDisplaySubsystem> displays = new List<XRDisplaySubsystem>(1);
         private static Task<SettingsReadResult> pendingRead;
         private static SettingsReadResult? readyRead;
@@ -136,6 +141,7 @@ namespace BSFixes
 
         internal static void Stop()
         {
+            RestorePipelineScale();
             running = false;
             session++;
             readyRead = null;
@@ -153,6 +159,56 @@ namespace BSFixes
             hasGameScale = true;
             needsApply = true;
             return scale * appliedFactor;
+        }
+
+        internal static void ApplyPipelineGameScale(UniversalRenderPipelineAsset pipeline, float scale)
+        {
+            OwnPipeline(pipeline);
+            // A game settings change becomes the value restored when synchronization ends.
+            originalPipelineScale = scale;
+            pipeline.renderScale = AdjustGameScale(scale);
+            lastPipelineScale = pipeline.renderScale;
+        }
+
+        private static void OwnPipeline(UniversalRenderPipelineAsset pipeline)
+        {
+            if (ownedPipeline == pipeline) return;
+            RestorePipelineScale();
+            ownedPipeline = pipeline;
+            originalPipelineScale = pipeline.renderScale;
+            lastPipelineScale = originalPipelineScale;
+        }
+
+        private static void RestorePipelineScale()
+        {
+            if (ownedPipeline != null && Mathf.Approximately(ownedPipeline.renderScale, lastPipelineScale))
+                ownedPipeline.renderScale = originalPipelineScale;
+            ownedPipeline = null;
+        }
+
+        private static float BoundRenderScale(float scale)
+        {
+            if (!(GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset))
+                return Mathf.Clamp(scale, 0.1f, 4f);
+
+            scale = Mathf.Clamp(scale, UniversalRenderPipeline.minRenderScale, UniversalRenderPipeline.maxRenderScale);
+            // URP snaps its camera scale near one to one before sizing the XR target.
+            return Mathf.Abs(1f - scale) < 0.05f ? 1f : scale;
+        }
+
+        private static void ApplyRenderScale(XRDisplaySubsystem display, float scale)
+        {
+            if (GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset pipeline)
+            {
+                OwnPipeline(pipeline);
+                pipeline.renderScale = scale;
+                lastPipelineScale = pipeline.renderScale;
+            }
+            else
+            {
+                RestorePipelineScale();
+            }
+            display.scaleOfAllRenderTargets = scale;
         }
 
         internal static void Poll()
@@ -183,7 +239,10 @@ namespace BSFixes
             liveSettings = steamVR && hasGameScale && TryReadLiveAreaScale();
             UpdateSettingsRead(!liveSettings && steamVR && hasGameScale && settingsPath != null);
             if (display == null || !hasGameScale)
+            {
+                if (display == null) RestorePipelineScale();
                 return;
+            }
 
             int width = GetRenderWidth(display);
             if (width == 0 || display.scaleOfAllRenderTargets <= 0f)
@@ -240,7 +299,7 @@ namespace BSFixes
 
             if (Math.Abs(width - targetWidth) <= WidthTolerance)
             {
-                if (verifyResize)
+                if (verifyResize && width != previousRenderWidth)
                     logger.Info($"XR display resized from {previousRenderWidth} to {width} pixels per eye (scale {display.scaleOfAllRenderTargets:0.###}).");
                 verifyResize = false;
                 return;
@@ -255,12 +314,18 @@ namespace BSFixes
 
             // Closed loop on the measured eye width: correct whether or not Unity
             // re-reads the runtime recommendation when it rebuilds the swapchain.
-            float scale = Mathf.Clamp(display.scaleOfAllRenderTargets * targetWidth / width, 0.1f, 4f);
+            float scale = BoundRenderScale(display.scaleOfAllRenderTargets * targetWidth / width);
             if (Mathf.Abs(scale - display.scaleOfAllRenderTargets) < 0.0005f)
+            {
+                if (!warnedUnreachable)
+                    logger.Warn($"XR display cannot reach {targetWidth} pixels per eye at the pipeline's scale limits or rounding; actual {width}, scale {scale:0.###}.");
+                warnedUnreachable = true;
+                corrections = MaxCorrections;
                 return;
+            }
             if (!verifyResize)
                 previousRenderWidth = width;
-            display.scaleOfAllRenderTargets = scale;
+            ApplyRenderScale(display, scale);
             corrections++;
             verifyResize = true;
         }
@@ -450,11 +515,18 @@ namespace BSFixes
     {
         private static readonly MethodInfo EyeScaleSetter = AccessTools.PropertySetter(typeof(XRSettings), nameof(XRSettings.eyeTextureResolutionScale));
         private static readonly MethodInfo AdjustScale = AccessTools.Method(typeof(SteamVRResolutionSync), nameof(SteamVRResolutionSync.AdjustGameScale));
+        private static readonly MethodInfo PipelineScaleSetter = AccessTools.PropertySetter(typeof(UniversalRenderPipelineAsset), nameof(UniversalRenderPipelineAsset.renderScale));
+        private static readonly MethodInfo ApplyPipelineScale = AccessTools.Method(typeof(SteamVRResolutionSync), nameof(SteamVRResolutionSync.ApplyPipelineGameScale));
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             foreach (CodeInstruction instruction in instructions)
             {
+                if (instruction.Calls(PipelineScaleSetter))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, ApplyPipelineScale) { labels = instruction.labels, blocks = instruction.blocks };
+                    continue;
+                }
                 if (instruction.Calls(EyeScaleSetter))
                     yield return new CodeInstruction(OpCodes.Call, AdjustScale);
                 yield return instruction;
