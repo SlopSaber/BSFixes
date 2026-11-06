@@ -19,7 +19,7 @@ namespace BSFixes
     // Unity's OpenXR plugin sizes the swapchain from the runtime recommendation
     // once, so SteamVR resolution changes made while the game runs were ignored
     // (the 2019-era OpenVR path re-read it live). Follow the runtime's current
-    // recommendation, falling back to SteamVR's settings file, and drive the
+    // recommendation, falling back to SteamVR's live settings (OpenVR) or its settings file, and drive the
     // XR display's render scale until the measured eye width matches.
     internal static class SteamVRResolutionSync
     {
@@ -59,6 +59,7 @@ namespace BSFixes
         private static int session;
         private static int readRevision;
         private static bool running;
+        private static bool liveSettings;
         private static bool settingsPathResolved;
         private static bool readEligible;
         // Only the single settings worker reads or writes this cache.
@@ -179,7 +180,8 @@ namespace BSFixes
             }
 
             bool steamVR = display != null && OpenXRRuntime.name.IndexOf("SteamVR", StringComparison.OrdinalIgnoreCase) >= 0;
-            UpdateSettingsRead(steamVR && hasGameScale && settingsPath != null);
+            liveSettings = steamVR && hasGameScale && TryReadLiveAreaScale();
+            UpdateSettingsRead(!liveSettings && steamVR && hasGameScale && settingsPath != null);
             if (display == null || !hasGameScale)
                 return;
 
@@ -215,7 +217,7 @@ namespace BSFixes
             float factor;
             string source;
             if (!float.IsNaN(runtimeFactor) && Mathf.Abs(runtimeFactor - 1f) >= 0.002f) { factor = runtimeFactor; source = "OpenXR recommendation"; }
-            else if (!float.IsNaN(fileFactor)) { factor = fileFactor; source = "SteamVR settings"; }
+            else if (!float.IsNaN(fileFactor)) { factor = fileFactor; source = liveSettings ? "SteamVR live settings" : "SteamVR settings file"; }
             else { factor = 1f; source = "launch size"; }
 
             int target = Mathf.RoundToInt(baseWidth * gameScale / baseGameScale * factor);
@@ -261,6 +263,26 @@ namespace BSFixes
             display.scaleOfAllRenderTargets = scale;
             corrections++;
             verifyResize = true;
+        }
+
+        // SteamVR writes steamvr.vrsettings lazily, so prefer the live values read through OpenVR.
+        private static bool TryReadLiveAreaScale()
+        {
+            if (!OpenVRSettings.TryConnect(logger))
+                return false;
+            OpenVRSettings.TryGetBool("steamvr", "supersampleManualOverride", out bool manualOverride);
+            float global = 1f;
+            if (manualOverride && !OpenVRSettings.TryGetFloat("steamvr", "supersampleScale", out global))
+                global = 1f;
+            if (!OpenVRSettings.TryGetFloat(AppSection, "resolutionScale", out float appPercent))
+                appPercent = 100f;
+            float areaScale = global * appPercent / 100f;
+            if (areaScale < 0.1f || areaScale > 20f || float.IsNaN(areaScale))
+                return false;
+            hasFileRead = true;
+            lastAreaScale = areaScale;
+            lastManualOverride = manualOverride;
+            return true;
         }
 
         private static void UpdateSettingsRead(bool eligible)
