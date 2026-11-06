@@ -43,6 +43,7 @@ namespace BSFixes
             TypeWarmup.Stop();
             harmony.UnpatchSelf();
             HighQualityObstacles.Stop();
+            ColdplaySphereMaterials.Stop();
             DefaultFontAssetFix.Stop();
             if (filteringHandler != null && ReferenceEquals(Debug.unityLogger.logHandler, filteringHandler))
                 Debug.unityLogger.logHandler = originalHandler;

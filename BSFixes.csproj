@@ -29,6 +29,7 @@
     <Reference Include="BeatSaber.Settings" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\BeatSaber.Settings.dll" Private="false" />
     <Reference Include="BeatSaber.GameSettings" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\BeatSaber.GameSettings.dll" Private="false" />
     <Reference Include="Rendering" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\Rendering.dll" Private="false" />
+    <Reference Include="HMRendering" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\HMRendering.dll" Private="false" />
     <Reference Include="Unity.RenderPipelines.Core.Runtime" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\Unity.RenderPipelines.Core.Runtime.dll" Private="false" />
     <Reference Include="Unity.RenderPipelines.Universal.Runtime" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\Unity.RenderPipelines.Universal.Runtime.dll" Private="false" />
     <Reference Include="BGLib.UnityExtension" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\BGLib.UnityExtension.dll" Private="false" />
