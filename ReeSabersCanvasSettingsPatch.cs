@@ -11,10 +11,11 @@ namespace BSFixes
     internal static class ReeSabersCanvasSettingsPatch
     {
         private static readonly FieldInfo Cache = AccessTools.Field(typeof(CurvedCanvasSettingsHelper), "_curvedCanvasCache");
+        private static readonly bool IsSupportedVersion = Application.version.StartsWith("1.45.3", StringComparison.Ordinal);
 
         private static void Postfix(CurvedCanvasSettingsHelper __instance, Canvas canvas, ref CurvedCanvasSettings __result)
         {
-            if (__result != null || canvas == null || !Application.version.StartsWith("1.45.3", StringComparison.Ordinal))
+            if (__result != null || canvas == null || !IsSupportedVersion)
                 return;
 
             Canvas root = canvas.rootCanvas;
