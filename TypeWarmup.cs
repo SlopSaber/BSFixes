@@ -121,8 +121,17 @@ namespace BSFixes
             var total = Stopwatch.StartNew();
             var budget = Stopwatch.StartNew();
             int types = 0, methods = 0, failed = 0;
+            var loaded = new HashSet<string>(AppDomain.CurrentDomain.GetAssemblies().Select(assembly => assembly.GetName().Name), StringComparer.Ordinal);
+            var removed = new List<string>();
             foreach (string name in names)
             {
+                // Resolving a name from an uninstalled mod makes the loader report a missing library.
+                if (!ReferencedAssemblies(name).All(loaded.Contains))
+                {
+                    removed.Add(name);
+                    continue;
+                }
+
                 Type type = null;
                 try { type = Type.GetType(name, false); }
                 catch { }
@@ -145,7 +154,25 @@ namespace BSFixes
                     }
                 }
             }
-            log?.Info($"Warmed {types} types and {methods} methods over {total.ElapsedMilliseconds} ms ({failed} skipped).");
+            if (removed.Count > 0)
+            {
+                Known.ExceptWith(removed);
+                try { File.WriteAllLines(ListPath, Known.OrderBy(name => name, StringComparer.Ordinal)); }
+                catch (Exception error) { log?.Debug($"Type warm-up list not saved: {error.Message}"); }
+            }
+            log?.Info($"Warmed {types} types and {methods} methods over {total.ElapsedMilliseconds} ms ({failed} skipped, {removed.Count} from unloaded assemblies removed).");
+        }
+
+        // Assembly-qualified names list each assembly as ", Name, Version=..." (generic arguments included).
+        private static IEnumerable<string> ReferencedAssemblies(string name)
+        {
+            int index = 0;
+            while ((index = name.IndexOf(", Version=", index, StringComparison.Ordinal)) >= 0)
+            {
+                int start = name.LastIndexOf(", ", index - 1, StringComparison.Ordinal);
+                if (start >= 0) yield return name.Substring(start + 2, index - start - 2);
+                index += 10;
+            }
         }
 
         private static IEnumerable<MethodBase> Methods(Type type)
