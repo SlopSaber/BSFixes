@@ -42,14 +42,17 @@ namespace BSFixes
                 ? AccessTools.Method(analyzer, "TryGetInfo", new[] { typeof(Type) }) : null;
             if (tryGetInfo == null)
             {
+                CompatibilitySummary.Record("Type warm-up", "unsupported: Zenject analyzer target missing");
                 logger.Warn("Type warm-up skipped: Zenject.TypeAnalyzer.TryGetInfo was not found.");
                 return;
             }
             harmony.Patch(tryGetInfo, postfix: new HarmonyMethod(AccessTools.Method(typeof(TypeWarmup), nameof(Analyzed))));
+            CompatibilitySummary.Record("Type warm-up", "postfix registered; host not yet created");
             var host = new GameObject("BSFixes Type Warmup");
             DontDestroyOnLoad(host);
             instance = host.AddComponent<TypeWarmup>();
             instance.analyze = type => tryGetInfo.Invoke(null, new object[] { type });
+            CompatibilitySummary.Record("Type warm-up", "postfix registered; host started, budgeted warm-up pending");
         }
 
         internal static void Stop()

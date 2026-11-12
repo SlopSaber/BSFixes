@@ -20,19 +20,38 @@ namespace BSFixes
         private static readonly MethodInfo SetAlpha = AccessTools.PropertySetter(typeof(CanvasGroup), nameof(CanvasGroup.alpha));
         private static readonly MethodInfo SetAlphaOnly = AccessTools.Method(typeof(TransitionAlphaPatch), nameof(SetTransitionAlpha));
         private static int alphaOnlyDepth;
+        private static int unreadableMethods;
 
         internal static void Apply(Harmony harmony)
         {
-            var transpiler = new HarmonyMethod(AccessTools.Method(typeof(TransitionAlphaPatch), nameof(Transpiler)));
-            foreach (MethodBase method in AlphaWriters())
-                harmony.Patch(method, transpiler: transpiler);
-
-            var skip = new HarmonyMethod(AccessTools.Method(typeof(TransitionAlphaPatch), nameof(SkipDuringAlphaChange)));
-            foreach (Type type in new[] { typeof(Selectable), typeof(Interactable), typeof(InteractableTextMeshPro) })
+            int writers = 0, handlers = 0, missingHandlers = 0;
+            unreadableMethods = 0;
+            bool completed = false;
+            try
             {
-                MethodInfo handler = AccessTools.DeclaredMethod(type, "OnCanvasGroupChanged");
-                if (handler != null)
-                    harmony.Patch(handler, prefix: skip);
+                var transpiler = new HarmonyMethod(AccessTools.Method(typeof(TransitionAlphaPatch), nameof(Transpiler)));
+                foreach (MethodBase method in AlphaWriters())
+                {
+                    harmony.Patch(method, transpiler: transpiler);
+                    ++writers;
+                }
+
+                var skip = new HarmonyMethod(AccessTools.Method(typeof(TransitionAlphaPatch), nameof(SkipDuringAlphaChange)));
+                foreach (Type type in new[] { typeof(Selectable), typeof(Interactable), typeof(InteractableTextMeshPro) })
+                {
+                    MethodInfo handler = AccessTools.DeclaredMethod(type, "OnCanvasGroupChanged");
+                    if (handler != null)
+                    {
+                        harmony.Patch(handler, prefix: skip);
+                        ++handlers;
+                    }
+                    else ++missingHandlers;
+                }
+                completed = true;
+            }
+            finally
+            {
+                CompatibilitySummary.Record("Transition alpha", $"{writers} writer and {handlers} handler registrations; {missingHandlers} handlers unavailable; {unreadableMethods} unreadable methods skipped" + (completed ? "" : "; partial startup"));
             }
         }
 
@@ -47,7 +66,7 @@ namespace BSFixes
                         if (method.IsAbstract || method.ContainsGenericParameters) continue;
                         bool writesAlpha;
                         try { writesAlpha = PatchProcessor.ReadMethodBody(method).Any(op => op.Value is MethodInfo called && called == SetAlpha); }
-                        catch (Exception) { writesAlpha = false; }
+                        catch (Exception) { writesAlpha = false; ++unreadableMethods; }
                         if (writesAlpha) yield return method;
                     }
                 }

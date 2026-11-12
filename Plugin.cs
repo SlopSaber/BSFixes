@@ -16,24 +16,48 @@ namespace BSFixes
         [Init]
         public void Init(IPALogger logger)
         {
+            CompatibilitySummary.Reset();
             pluginLogger = logger;
             originalHandler = Debug.unityLogger.logHandler;
             filteringHandler = new FilteringLogHandler(originalHandler);
             Debug.unityLogger.logHandler = filteringHandler;
             HighQualityObstacles.Initialize(logger);
             DefaultFontAssetFix.Start(logger);
-            harmony.PatchAll(typeof(Plugin).Assembly);
+            try { harmony.PatchAll(typeof(Plugin).Assembly); }
+            catch
+            {
+                CompatibilitySummary.Write(harmony, logger, "incomplete (automatic registration failed)");
+                throw;
+            }
+            CompatibilitySummary.Record("Transition alpha", "starting");
             try { TransitionAlphaPatch.Apply(harmony); }
-            catch (System.Exception exception) { logger.Warn($"Transition alpha patch skipped: {exception.Message}"); }
-            logger.Info("Installed runtime compatibility fixes and Unity startup log filters.");
+            catch (System.Exception exception)
+            {
+                CompatibilitySummary.Failed("Transition alpha", exception);
+                logger.Warn($"Transition alpha patch skipped: {exception.Message}");
+            }
         }
 
         [OnStart]
         public void OnStart()
         {
-            SteamVRResolutionSync.Start(pluginLogger);
-            try { TypeWarmup.Start(harmony, pluginLogger); }
-            catch (System.Exception exception) { pluginLogger.Warn($"Type warm-up skipped: {exception.Message}"); }
+            bool completed = false;
+            try
+            {
+                SteamVRResolutionSync.Start(pluginLogger);
+                CompatibilitySummary.Record("Type warm-up", "starting");
+                try { TypeWarmup.Start(harmony, pluginLogger); }
+                catch (System.Exception exception)
+                {
+                    CompatibilitySummary.Failed("Type warm-up", exception);
+                    pluginLogger.Warn($"Type warm-up skipped: {exception.Message}");
+                }
+                completed = true;
+            }
+            finally
+            {
+                CompatibilitySummary.Write(harmony, pluginLogger, completed ? "startup snapshot" : "incomplete startup snapshot");
+            }
         }
 
         [OnExit]

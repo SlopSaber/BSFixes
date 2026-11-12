@@ -26,7 +26,12 @@ namespace BSFixes
             return loader == null ? null : AccessTools.AsyncMoveNext(loader);
         }
 
-        private static bool Prepare() => TargetMethod() != null;
+        private static bool Prepare()
+        {
+            bool available = TargetMethod() != null;
+            CompatibilitySummary.Record("Media sprite copy", available ? "target found; pattern not inspected" : "unsupported: loader target missing");
+            return available;
+        }
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
@@ -35,9 +40,13 @@ namespace BSFixes
             int setIndex = list.FindIndex(code => code.Calls(SetPixels));
             // Leave the method untouched unless it has exactly the expected copy.
             if (getIndex < 0 || setIndex < getIndex || list.FindLastIndex(code => code.Calls(GetPixels)) != getIndex)
+            {
+                CompatibilitySummary.Record("Media sprite copy", "skipped: expected copy pattern missing or ambiguous");
                 return list;
+            }
             list[getIndex] = new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MediaSpritePixelCopyPatch), nameof(CaptureSource))).WithLabels(list[getIndex].labels);
             list[setIndex] = new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MediaSpritePixelCopyPatch), nameof(CopyCaptured))).WithLabels(list[setIndex].labels);
+            CompatibilitySummary.Record("Media sprite copy", "expected copy pattern transformed");
             return list;
         }
 
