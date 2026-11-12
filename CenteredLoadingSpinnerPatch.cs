@@ -20,7 +20,12 @@ namespace BSFixes
             return AccessTools.Method(AccessTools.TypeByName("MainEffectLoadingIndicatorPass"), "RecordRenderGraph");
         }
 
-        private static bool Prepare() => TargetMethod() != null;
+        private static bool Prepare()
+        {
+            bool available = TargetMethod() != null;
+            CompatibilitySummary.Record("Centered spinner", available ? "target found; pattern not inspected" : "unsupported: render target missing");
+            return available;
+        }
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
@@ -30,9 +35,13 @@ namespace BSFixes
             // Change nothing unless both offsets appear exactly once.
             if (right < 0 || down < 0 || list.FindLastIndex(code => IsFloat(code, OffsetRight)) != right
                 || list.FindLastIndex(code => IsFloat(code, OffsetDown)) != down)
+            {
+                CompatibilitySummary.Record("Centered spinner", "skipped: offsets missing or ambiguous");
                 return list;
+            }
             list[right].operand = 0f;
             list[down].operand = 0f;
+            CompatibilitySummary.Record("Centered spinner", "expected offsets transformed");
             return list;
         }
 
